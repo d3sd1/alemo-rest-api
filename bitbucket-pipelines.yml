@@ -1,0 +1,67 @@
+# This is a sample build configuration for Java (Maven).
+# Check our guides at https://confluence.atlassian.com/x/zd-5Mw for more examples.
+# Only use spaces to indent your .yml configuration.
+# -----
+# You can specify a custom docker image from Docker Hub as your build environment.
+image: maven:3.6.1
+
+pipelines:
+  branches:
+      develop:
+      - step:
+          name: Compile
+          script:
+              - mvn -Dmaven.test.skip  compile
+              - mvn -Dmaven.test.skip  package
+          artifacts:
+            - target/**
+      - step:
+          name: Upload to AWS-S3
+          script: # Modify the commands below to build your repository.
+              - pipe: atlassian/aws-elasticbeanstalk-deploy:0.6.6
+                variables:
+                  AWS_ACCESS_KEY_ID: $AWS_ACCESS_KEY_ID
+                  AWS_SECRET_ACCESS_KEY: $AWS_SECRET_ACCESS_KEY
+                  AWS_DEFAULT_REGION: $AWS_DEFAULT_REGION
+                  APPLICATION_NAME: $AWS_APP_NAME
+                  COMMAND: 'upload-only'
+                  ENVIRONMENT_NAME: $AWS_ENV_NAME
+                  ZIP_FILE: './target/alemo.war'
+                  DEBUG: 'true' # Optional.
+                  S3_BUCKET: $AWS_S3_BUCKET_NAME
+                  VERSION_LABEL: 'deploy-$BITBUCKET_BUILD_NUMBER-multiple'
+      - step:
+          name: Autodeploy to test
+          deployment: test
+          caches:
+            - maven
+          script: # Modify the commands below to build your repository.
+            - pipe: atlassian/aws-elasticbeanstalk-deploy:0.6.6
+              variables:
+                AWS_ACCESS_KEY_ID: $AWS_ACCESS_KEY_ID
+                AWS_SECRET_ACCESS_KEY: $AWS_SECRET_ACCESS_KEY
+                AWS_DEFAULT_REGION: $AWS_DEFAULT_REGION
+                APPLICATION_NAME: $AWS_APP_NAME
+                COMMAND: 'deploy-only'
+                VERSION_LABEL: 'deploy-$BITBUCKET_BUILD_NUMBER-multiple'
+                ENVIRONMENT_NAME: $AWS_ENV_NAME
+                WAIT: 'true'
+
+
+      - step:
+          trigger: manual
+          name: Manual deploy to prod
+          deployment: prod
+          caches:
+            - maven
+          script: # Modify the commands below to build your repository.
+            - pipe: atlassian/aws-elasticbeanstalk-deploy:0.6.6
+              variables:
+                AWS_ACCESS_KEY_ID: $AWS_ACCESS_KEY_ID
+                AWS_SECRET_ACCESS_KEY: $AWS_SECRET_ACCESS_KEY
+                AWS_DEFAULT_REGION: $AWS_DEFAULT_REGION
+                APPLICATION_NAME: $AWS_APP_NAME
+                COMMAND: 'deploy-only'
+                VERSION_LABEL: 'deploy-$BITBUCKET_BUILD_NUMBER-multiple'
+                ENVIRONMENT_NAME: $AWS_ENV_NAME
+                WAIT: 'true'
